@@ -36,36 +36,57 @@ class ImageBuilder:
         return image
 
 
-class NeuralNetwork:
+def cut_image_array_on_frames(image_array, count_of_frames: tuple, size_of_frame: tuple):
+    array_of_brightness = list()
+    count_of_frame_by_width, count_of_frame_by_height = count_of_frames
+    frame_width, frame_height = size_of_frame
+    x_step = 0
+    y_step = 0
+    for frame_y in range(count_of_frame_by_width):
+        for frame_x in range(count_of_frame_by_height):
+            frame_brightness = list()
+            for y in range(frame_height):
+                for x in range(frame_width):
+                    frame_brightness.append(image_array[x + x_step, y + y_step] / 255)
+            array_of_brightness.append(frame_brightness)
+            x_step += frame_width
+        y_step += frame_height
+        x_step = 0
+    return array_of_brightness
+
+
+class ImageConverter:
 
     def __init__(self, file: str):
-        self.__image_builder = ImageBuilder(
+        self.__image = ImageBuilder(
             file,
             (500, 500),  # 500 x 500
             (144, 144, 400, 400)  # 144; 144; 400; 400
-        )
+        ).build()
+
+    def __get_framed_image_size(self, frame_width: int, frame_height: int) -> tuple:
+        size_x, size_y = self.__image.size
+        size_frame_x = int(size_x / frame_width)
+        size_frame_y = int(size_y / frame_height)
+        return size_frame_x, size_frame_y
+
+    def __cut_image_array_on_frames(self, count_of_frames: tuple, size_of_frame: tuple):
+        return cut_image_array_on_frames(self.__image.load(), count_of_frames, size_of_frame)
 
     def get_brightness_array(self, width, height):
-        image = self.__image_builder.build()
-        size_x, size_y = image.size
-        size_frame_x = int(size_x / width)
-        size_frame_y = int(size_y / height)
-        pixels = image.load()
-        array_of_brightness = list()
-        x_step = 0
-        y_step = 0
-        for frame_index_y in range(size_frame_y):
-            frame_brightness_array = []
-            y_step += height
-            for frame_index in range(size_frame_x):
-                x_step += width
-                for y in range(height):
-                    for x in range(width):
-                        frame_brightness_array.append(pixels[x + x_step, y + y_step] / 255)
-                array_of_brightness.append(frame_brightness_array)
-        return array_of_brightness
+        size_frame_x, size_frame_y = self.__get_framed_image_size(width, height)
+        return self.__cut_image_array_on_frames(
+            (size_frame_x, size_frame_y),
+            (width, height)
+        )
+
+
+class NeuralNetwork:
+
+    pass
 
 
 if __name__ == "__main__":
-    a = NeuralNetwork("test2.png")
-    print(a.get_brightness_array(4, 4))
+    converter = ImageConverter(
+        "image.png",
+    )
