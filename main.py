@@ -1,92 +1,55 @@
-from PIL import Image
+import numpy as np
+from network import NeuralNetwork, Dense, Tanh, Model, Relu, Softmax, flatten
+from tensorflow.keras.datasets import fashion_mnist, mnist
+import matplotlib.pyplot as plt
 
 
-class ImageBuilder:
-
-    def __init__(self, file: str, size: tuple, crop_size: tuple):
-        self.__file = Image.open(file)
-        self.__size = size
-        self.__crop_size = crop_size
-
-    def build(self):
-        gray_image = self.__to_gray_scale()
-        resized_image = self.__resize(gray_image)
-        cropped_image = self.__crop(resized_image)
-        return cropped_image
-
-    def __to_gray_scale(self):
-        return self.__file.convert("L")
-
-    def __crop(self, image: Image):
-        left_x, left_y, right_x, right_y = self.__crop_size
-        return image.crop((left_x, left_y, right_x, right_y))
-
-    def __resize(self, image: Image):
-        old_height, old_width = image.size
-        width, height = self.__size
-        if width and height:
-            max_size = (width, height)
-        elif width:
-            max_size = (width, old_height)
-        elif height:
-            max_size = (old_width, height)
-        else:
-            raise RuntimeError()
-        image.thumbnail(max_size, Image.ANTIALIAS)
-        return image
+def draw_fashion_with_predictions(test_choice, prediction):
+    class_names = [
+        'Футболка/Топ', 'Брюки', 'Свитер', 'Платье', 'Куртка',
+        'Сандали/туфли', 'Рубашка', 'Кроссовки', 'Сумка', 'Ботинки'
+    ]
+    plt.figure()
+    plt.imshow(test_choice)
+    plt.colorbar()
+    plt.grid(False)
+    plt.suptitle(f"Предположительно, это {class_names[np.argmax(prediction)]}", fontsize=20, fontweight='bold')
+    plt.show()
 
 
-def cut_image_array_on_frames(image_array, count_of_frames: tuple, size_of_frame: tuple):
-    array_of_brightness = list()
-    count_of_frame_by_width, count_of_frame_by_height = count_of_frames
-    frame_width, frame_height = size_of_frame
-    x_step = 0
-    y_step = 0
-    for frame_y in range(count_of_frame_by_width):
-        for frame_x in range(count_of_frame_by_height):
-            frame_brightness = list()
-            for y in range(frame_height):
-                for x in range(frame_width):
-                    frame_brightness.append(image_array[x + x_step, y + y_step] / 255)
-            array_of_brightness.append(frame_brightness)
-            x_step += frame_width
-        y_step += frame_height
-        x_step = 0
-    return array_of_brightness
-
-
-class ImageConverter:
-
-    def __init__(self, file: str):
-        self.__image = ImageBuilder(
-            file,
-            (500, 500),  # 500 x 500
-            (144, 144, 400, 400)  # 144; 144; 400; 400
-        ).build()
-
-    def __get_framed_image_size(self, frame_width: int, frame_height: int) -> tuple:
-        size_x, size_y = self.__image.size
-        size_frame_x = int(size_x / frame_width)
-        size_frame_y = int(size_y / frame_height)
-        return size_frame_x, size_frame_y
-
-    def __cut_image_array_on_frames(self, count_of_frames: tuple, size_of_frame: tuple):
-        return cut_image_array_on_frames(self.__image.load(), count_of_frames, size_of_frame)
-
-    def get_brightness_array(self, width, height):
-        size_frame_x, size_frame_y = self.__get_framed_image_size(width, height)
-        return self.__cut_image_array_on_frames(
-            (size_frame_x, size_frame_y),
-            (width, height)
-        )
-
-
-class NeuralNetwork:
-
-    pass
+def draw_digits_with_predictions(test_choice, prediction):
+    plt.figure()
+    plt.imshow(test_choice)
+    plt.colorbar()
+    plt.grid(False)
+    plt.suptitle(f"Предположительно, это {np.argmax(prediction)}", fontsize=20, fontweight='bold')
+    plt.show()
 
 
 if __name__ == "__main__":
-    converter = ImageConverter(
-        "image.png",
-    )
+    nn = NeuralNetwork()
+
+    (x_train, y_train), (x_test, y_test) = mnist.load_data()
+    # (x_train, y_train), (x_test, y_test) = fashion_mnist.load_data()
+
+    x_train_flatten, y_train_flatten = flatten(x_train, y_train, 28 * 28, 10)
+    x_test_flatten, y_test_flatten = flatten(x_test, y_test, 28 * 28, 10)
+
+    x_train_flatten /= 255
+    x_test_flatten /= 255
+
+    nn.add_layer(Dense(28 * 28, 40, activator=Tanh))
+    nn.add_layer(Dense(40, 10, activator=Tanh))
+    # nn.train_with_teacher(x_train_flatten[:10000], y_train_flatten[:10000], 25)
+    model = Model(nn, "weights_digits.txt")
+    # model.save()
+    count_test = 100
+    predictions = model.predict(x_test_flatten[:count_test])
+    accuracy = model.get_accuracy(x_test_flatten[:count_test], y_test_flatten[:count_test])
+    print(f"test accuracy: {accuracy}")
+
+    for i in range(count_test):
+        draw_digits_with_predictions(x_test[i], predictions[i])
+
+    # for i in range(count_test):
+    #     draw_fashion_with_predictions(x_test_without_shape[i], predictions[i])
